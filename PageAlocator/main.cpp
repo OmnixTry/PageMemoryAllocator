@@ -4,6 +4,12 @@
 #include <map>
 using namespace std;
 
+#define PAGE_SIZE 4096 // 4 kb
+#define MEMORY_SIZE 16384 //16 kb
+#define PAGE_AMOUNT ceil(MEMORY_SIZE / PAGE_SIZE)
+#define MIN_CLASS_SIZE 16 // 2^x where x >= 4
+#define BLOCK_HEADER_SIZE 1 //bool busy or not
+
 static void* startPointer;
 
 enum class pageStatus {
@@ -45,6 +51,35 @@ void initializePages() {
 	}
 }
 
+// sets the info for a particular header that works for the page with address
+void setPageHeader(void* pagePointer, pageStatus status, void* blockPointer, size_t classSize) {
+	headers[pagePointer].status = status;
+	headers[pagePointer].availableBlock = (uint8_t*)blockPointer;
+	headers[pagePointer].classSize = classSize;
+}
+
+// sets status of a block with a particular addres
+void setBlockHeader(void* blockPointer, bool status) {
+	uint8_t* pointer = (uint8_t*)blockPointer;
+	*pointer = status;
+}
+
+
+void* anyFreeBlock(void* pagePointer, size_t classSize) {
+	// starts at the begining of the page
+	// moves forvard on size of a block class
+	// stops when end of the page is reached
+	for (uint8_t* cursor = (uint8_t*)pagePointer; cursor != (uint8_t*)pagePointer + PAGE_SIZE; cursor += classSize)
+	{
+		// if the current block is free
+		// returns pointer to this block
+		if ((bool)*cursor == true)
+		{
+			return cursor + BLOCK_HEADER_SIZE;
+		}
+	}
+	return nullptr;
+}
 
 void main() 
 {
