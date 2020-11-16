@@ -139,10 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Allocator.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="NumberDefinitions.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="PageAllocator.h" />
     <ClInclude Include="NumberDefinitions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

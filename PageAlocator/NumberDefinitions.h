@@ -2,8 +2,9 @@
 class NumberDefinitions
 {
 public:
-	const int pageSize= 4096; // four kilobytes
-	const int wholeMemory = 32768; // thirty two kilobytes
-	const int minBlockClassSize = 16;
+	static const int PageSize= 4096; // four kilobytes
+	static const int WholeMemorySize = 32768; // thirty two kilobytes
+	static const int MinBlockClassSize = 16;
+	static char WholeMemory[WholeMemorySize];
 };
 
