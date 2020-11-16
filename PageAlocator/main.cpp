@@ -81,6 +81,33 @@ void* anyFreeBlock(void* pagePointer, size_t classSize) {
 	return nullptr;
 }
 
+bool setBlocksSize(size_t classSize) {
+	// can't do if there are no empty pages
+	if (freePages.empty()) {
+		return false;
+	}
+
+	// take first free page
+	uint8_t* freePage = (uint8_t*)freePages[0];
+
+	// untill cursor reaches end of the page
+	// move forward on the size of the block
+	// set first byte to true to mrk block as free
+	for (uint8_t* cursor = freePage; cursor != freePage + PAGE_SIZE; cursor += classSize) {
+		*cursor = true;
+	}
+
+	// remove page from free pages ('cause it's divided into blocks allredy)
+	// make it's header
+	// add it to pages that are divided into classes
+	freePages.erase(freePages.begin());
+	setPageHeader(freePage, pageStatus::Divided, freePage + BLOCK_HEADER_SIZE, classSize);
+	classifiedPages[classSize].push_back(freePage);
+
+	return true;
+}
+
+
 void main() 
 {
 	
