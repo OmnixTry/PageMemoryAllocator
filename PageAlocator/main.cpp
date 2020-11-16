@@ -81,6 +81,17 @@ void* anyFreeBlock(void* pagePointer, size_t classSize) {
 	return nullptr;
 }
 
+bool isEveryBlockFree(void* pagePointer, size_t classSize) {
+	for (uint8_t* cursor = (uint8_t*)pagePointer; cursor != (uint8_t*)pagePointer + PAGE_SIZE; cursor += classSize)
+	{
+		if ((bool)*cursor == false)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 bool setBlocksSize(size_t classSize) {
 	// can't do if there are no empty pages
 	if (freePages.empty()) {
@@ -107,6 +118,76 @@ bool setBlocksSize(size_t classSize) {
 	return true;
 }
 
+void* mem_alloc(size_t size) {
+	// if operation fails return nullpointer
+	void* pointer = nullptr;
+
+	// if we need space less than half of the page wee need a block of power of 2
+	if (size <= PAGE_SIZE / 2) {
+		// find apropreate block size
+		size_t classSize = powerOfTwoAligment(size + BLOCK_HEADER_SIZE);
+
+		// if there's no page for this class
+		// and if we can't make new page for this class 
+		// operation fails
+		if (classifiedPages[classSize].empty() && !setBlocksSize(classSize)) {
+			return nullptr;
+		}
+
+		// take classified page
+		// set header of the first available block to occupied
+		// save this block to pointer
+		uint8_t* page = (uint8_t*)classifiedPages[classSize].at(0); // take first popavshuyusia
+		setBlockHeader(headers[page].availableBlock - BLOCK_HEADER_SIZE, false);
+		pointer = headers[page].availableBlock;
+
+		// check if there are any free blocks in the page
+		uint8_t* freeBlock = (uint8_t*)anyFreeBlock(page, classSize);
+		// if there are save it as the first free bolck
+		if (freeBlock != nullptr) {
+			headers[page].availableBlock = freeBlock;
+		}
+
+		// if there's no more free blocks in page
+		// delete page from classified
+		// 'cause there must be only non full pages (that have some empty blocks)
+		else
+		{
+			classifiedPages[classSize].erase(std::find(classifiedPages[classSize].begin(),
+				classifiedPages[classSize].end(), page));
+		}
+	}
+	// else we have multipage block
+	else
+	{
+		// find number of needed pages
+		int pagesNeeded = ceil((double)size / PAGE_SIZE);
+
+		// if not enough free pages exist 
+		// then fail
+		if (freePages.size() < pagesNeeded)
+		{
+			return nullptr;
+		}
+
+		pointer = freePages[0];
+
+		// going through free pages for as many times as many pages wee require
+		for (int i = 1; i <= pagesNeeded; i++)
+		{
+			// take first page and. if we'll need one more take second one
+			uint8_t* page = (uint8_t*)freePages[0];
+			uint8_t* nextPage = pagesNeeded == i ? nullptr : (uint8_t*)freePages[1];
+
+			// set a header for first page, make it occupied, set addres  of the next block, 
+			// set how much more space this multipage block takes
+			setPageHeader(page, pageStatus::MultipageBlock, i == pagesNeeded ? nullptr : nextPage + BLOCK_HEADER_SIZE, pagesNeeded * PAGE_SIZE);
+
+			freePages.erase(freePages.begin());
+		}
+	}
+	return pointer;
+}
 
 void main() 
 {
