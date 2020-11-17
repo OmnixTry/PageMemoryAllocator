@@ -220,7 +220,7 @@ void mem_free(void* addr) {
 	if (headers[page].status == pageStatus::Divided)
 	{
 		// mark the requested block as free 
-		uint8_t* blockToFree = addr - BLOCK_HEADER_SIZE;
+		uint8_t* blockToFree = (uint8_t*)addr - BLOCK_HEADER_SIZE;
 		*blockToFree = true;
 
 		if (isEveryBlockFree(page, headers[page].classSize))
@@ -256,6 +256,121 @@ void mem_free(void* addr) {
 			freePages.push_back(page);
 			page = nextPage;
 		}
+	}
+}
+
+void* mem_realloc(void* addr, size_t size) {
+	// can't realloc nothind
+	// or something outside our memory
+	if (addr == nullptr)
+	{
+		return mem_alloc(size);
+	}
+
+	if ((uint8_t*)addr < (uint8_t*)startPointer || (uint8_t*)addr >(uint8_t*)startPointer + MEMORY_SIZE) {
+		return nullptr;
+	}
+
+	// get the beginig of the page and find how many pages belong to the block
+	void* pointer = addr;
+	size_t pageIndex = ((uint8_t*)addr - (uint8_t*)startPointer) / PAGE_SIZE;
+	uint8_t* page = (uint8_t*)startPointer + pageIndex * PAGE_SIZE;
+
+	if (headers[page].status == pageStatus::Divided)
+	{
+		size_t classSize = powerOfTwoAligment(size);
+		// if the class is the same don't doooo a thing 
+		if (headers[page].classSize == classSize)
+		{
+			return addr;
+		}
+
+		// allocate new memory		
+		pointer = mem_alloc(size);
+		// free old memory
+		mem_free(addr);
+		return pointer;
+	}
+	if (headers[page].status == pageStatus::MultipageBlock)
+	{
+		// get info about old version
+		size_t sizeOld = headers[page].classSize;
+		double amountOfPagesOld = ceil(headers[page].classSize / PAGE_SIZE);
+		double pagesNeeded = powerOfTwoAligment(size) / PAGE_SIZE;
+
+		// if the same number of pages required
+		// do NOTHING
+		if (amountOfPagesOld == pagesNeeded)
+		{
+			return addr;
+		}
+
+		// if we now need a smal block
+		// allocate new memory
+		// free old memory
+		if (size <= PAGE_SIZE / 2)
+		{
+			mem_free(addr);
+			pointer = mem_alloc(size);
+			return pointer;
+		}
+
+		// if more pages
+		if (amountOfPagesOld < pagesNeeded)
+		{
+			// if not enough free pages - fail
+			if (pagesNeeded - amountOfPagesOld > freePages.size())
+			{
+				return nullptr;
+			}
+
+
+			uint8_t* nextPage;
+			for (int i = 1; i <= pagesNeeded; i++)
+			{
+				// available block contains addres of the next page in squence
+				// contains NOTHINGNESS if we're outside the preexisting pages
+				nextPage = headers[page].availableBlock - BLOCK_HEADER_SIZE;
+
+				// if we are outside pages that were already allocated before, 
+				// we allocate a new page, put it after the previous one
+				// and remove it from free
+				if (i >= amountOfPagesOld)
+				{
+					page = (uint8_t*)freePages[0];
+					nextPage = pagesNeeded == i ? nullptr : (uint8_t*)freePages[1];
+					setPageHeader(page, pageStatus::MultipageBlock, i == pagesNeeded ? nullptr : nextPage + BLOCK_HEADER_SIZE, pagesNeeded * PAGE_SIZE);
+					freePages.erase(freePages.begin());
+				}
+				page = nextPage;
+			}
+			return addr;
+		}
+		// if wee need less pages than before
+		if (amountOfPagesOld > pagesNeeded)
+		{
+
+			uint8_t* nextPage;
+			for (int i = 0; i < amountOfPagesOld; i++)
+			{
+				nextPage = headers[page].availableBlock - BLOCK_HEADER_SIZE;
+				// if it's outside the required number of pages
+				// mark this page as free
+				if (i >= pagesNeeded)
+				{
+					setPageHeader(page, pageStatus::Free, nullptr, 0);
+
+					freePages.push_back(page);
+				}
+				else
+				{
+					setPageHeader(page, pageStatus::MultipageBlock, i == pagesNeeded ? nullptr : nextPage + BLOCK_HEADER_SIZE, PAGE_SIZE * pagesNeeded);
+				}
+				page = nextPage;
+			}
+			return addr;
+		}
+
 	}
 }
 
