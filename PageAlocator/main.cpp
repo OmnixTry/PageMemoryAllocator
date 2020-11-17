@@ -374,7 +374,64 @@ void* mem_realloc(void* addr, size_t size) {
 	}
 }
 
-void main() 
-{
-	
+void mem_dump() {
+	std::cout << "-----------------------------------" << std::endl;
+	uint8_t* page = (uint8_t*)startPointer;
+	for (int i = 0; i < PAGE_AMOUNT; i++) {
+		memoryPageHeader header = headers[page];
+
+		std::string state;
+
+		switch (header.status)
+		{
+		case pageStatus::Free:
+			state = "Free";
+			break;
+		case pageStatus::Divided:
+			state = "Divided";
+			break;
+		case pageStatus::MultipageBlock:
+			state = "MultiPageBlock";
+			break;
+		}
+
+		std::cout << "PAGE " << i << std::endl;
+		std::cout << "Address: " << (uint16_t*)page << std::endl;
+		std::cout << "Status: " << state << std::endl;
+		std::cout << "Page size: " << PAGE_SIZE << std::endl;
+
+		if (header.status == pageStatus::Divided) {
+			std::cout << "Class size: " << header.classSize << std::endl;
+
+			for (int j = 0; j < PAGE_SIZE / header.classSize; j++) {
+				uint8_t* blockAddress = page + header.classSize * j + BLOCK_HEADER_SIZE;
+				uint8_t* isOccupied = blockAddress - BLOCK_HEADER_SIZE;
+				std::cout << "BLOCK " << j << std::endl;
+				std::cout << "Address " << (uint16_t*)blockAddress << std::endl;
+				std::cout << "Free " << (bool)*isOccupied << std::endl;
+			}
+		}
+		if (header.status == pageStatus::MultipageBlock)
+		{
+			std::cout << "Block size: " << header.classSize << std::endl;
+			std::cout << "Next block: " << (uint16_t*)header.availableBlock << std::endl;
+		}
+		page += PAGE_SIZE;
+		std::cout << "-----------------------------------" << std::endl;
+	}
+
+}
+int main() {
+	initializePages();
+	void* x1 = mem_alloc(5000);
+	void* x2 = mem_alloc(400);
+	void* x3 = mem_alloc(400);
+	std::cout << (uint16_t*)x1 << std::endl;
+	mem_dump();
+	mem_free(x1);
+	mem_free(x2);
+	mem_dump();
+	void* x5 = mem_realloc(x3, 50);
+	mem_dump();
+	return 0;
 }
