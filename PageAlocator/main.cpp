@@ -51,6 +51,19 @@ void initializePages() {
 	}
 }
 
+
+size_t powerOfTwoAligment(size_t number) {
+	size_t minValue = 1;
+
+	// stops on the first pwer of two number after the required number
+	while (minValue <= number)
+	{
+		minValue *= 2;
+	}
+
+	return minValue;
+}
+
 // sets the info for a particular header that works for the page with address
 void setPageHeader(void* pagePointer, pageStatus status, void* blockPointer, size_t classSize) {
 	headers[pagePointer].status = status;
@@ -187,6 +200,63 @@ void* mem_alloc(size_t size) {
 		}
 	}
 	return pointer;
+}
+
+void mem_free(void* addr) {
+	if (addr == nullptr)
+	{
+		return;
+	}
+
+	// if the pointer is outside our memory - than can't perform operation
+	if ((uint8_t*)addr < (uint8_t*)startPointer || (uint8_t*)addr >(uint8_t*)startPointer + MEMORY_SIZE) {
+		return;
+	}
+
+	// get the beginig of the page and find how many pages belong to the block
+	size_t pageIndex = ((uint8_t*)addr - (uint8_t*)startPointer) / PAGE_SIZE;
+	uint8_t* page = (uint8_t*)startPointer + pageIndex * PAGE_SIZE;
+
+	if (headers[page].status == pageStatus::Divided)
+	{
+		// mark the requested block as free 
+		uint8_t* blockToFree = addr - BLOCK_HEADER_SIZE;
+		*blockToFree = true;
+
+		if (isEveryBlockFree(page, headers[page].classSize))
+		{
+			// if all of the blocks are free 
+			// no need to store page in classified pages
+			// it's free now Hurray!
+			classifiedPages[headers[page].classSize].erase(std::find(classifiedPages[headers[page].classSize].begin(),
+				classifiedPages[headers[page].classSize].end(), page));
+			// mark header as free
+			setPageHeader(page, pageStatus::Free, nullptr, 0);
+			freePages.push_back(page);
+		}
+		// when the page is absolutely full it's deleted from classified pages
+		// when we free a block we need to add it to classified pages again
+		// if this page is not in the clasified pages add it to the classified pages
+		if (std::find(classifiedPages[headers[page].classSize].begin(),
+			classifiedPages[headers[page].classSize].end(), page) == classifiedPages[headers[page].classSize].end())
+		{
+			classifiedPages[headers[page].classSize].push_back(page);
+		}
+	}
+
+	// if it's block of many pages than free this one and all the following 
+	if (headers[page].status == pageStatus::MultipageBlock)
+	{
+		double amountOfPages = ceil(headers[page].classSize / PAGE_SIZE);
+
+		for (int i = 0; i < amountOfPages; i++)
+		{
+			uint8_t* nextPage = headers[page].availableBlock - BLOCK_HEADER_SIZE;
+			setPageHeader(page, pageStatus::Free, nullptr, 0);
+			freePages.push_back(page);
+			page = nextPage;
+		}
+	}
 }
 
 void main() 
